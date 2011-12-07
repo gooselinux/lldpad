@@ -1,0 +1,53 @@
+--- lldpad-0.9.38/lldpad.init.orig	2010-06-23 10:52:43.000000000 +0200
++++ lldpad-0.9.38/lldpad.init	2010-06-23 11:01:02.000000000 +0200
+@@ -151,6 +151,7 @@
+ # See how we were called.
+ case "$1" in
+ 	start)
++		[ "$EUID" = "0" ] || exit 4
+ 		echo -n $"Starting $LLDPAD: "
+ 		$LLDPAD_BIN -k
+ 		start_daemon $LLDPAD_BIN -d $OPTIONS
+@@ -158,6 +159,7 @@
+ 		[ $? -eq 0 ] && touch /var/lock/subsys/lldpad
+ 		;;
+ 	stop)
++		[ "$EUID" = "0" ] || exit 4
+ 		echo -n $"Shutting down $LLDPAD: "
+ 		killproc $LLDPAD
+ 		rc_status -v
+@@ -166,6 +168,19 @@
+ 	status)
+ 		echo -n "Checking for service $LLDPAD: "
+ 		p=`pidof $LLDPAD`
++		RC=$?
++		if [ "$RC" = "1" ]; then
++			echo "stopped"
++			if [ -f /var/lock/subsys/lldpad ]; then
++				rc_failed 2
++			elif [ -f /var/run/lldpad.pid ]; then
++				rc_failed 1
++			else
++				rc_failed 3
++			fi
++		else
++			echo "running"
++		fi
+ 		rc_status -v
+ 		;;
+ 	try-restart|condrestart)
+@@ -226,9 +238,13 @@
+ 		rc_failed 3
+ 		rc_status -v
+ 		;;
++	usage)
++		echo $"Usage: $0 {start|stop|status|try-restart|restart|force-reload|reload}"
++		exit 0
++	;;
+ 	*)
+        		echo $"Usage: $0 {start|stop|status|try-restart|restart|force-reload|reload}"
+-		exit 1
++		exit 2
+ esac
+ 
+ rc_exit

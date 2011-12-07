@@ -1,0 +1,22 @@
+diff -Nurp dcbd-0.9.7-current/dcbd.init dcbd-0.9.7-corrected/dcbd.init
+--- dcbd-0.9.7-current/lldpad.init	2009-03-11 17:51:59.000000000 +0100
++++ dcbd-0.9.7-corrected/lldpad.init	2009-03-11 18:19:10.000000000 +0100
+@@ -33,15 +33,16 @@
+ # lldpad	This shell script takes care of starting and stopping
+ #		lldpad (including DCB capabilities exchange protocol)
+ #
+-# chkconfig: 345 20 80
++# chkconfig: 2345 20 80
+ # description: Link Layer Discovery Protocol Agent Daemon
+ #
+ ### BEGIN INIT INFO
+ # Provides: lldpad
+ # Required-Start: network
+ # Required-Stop:
+-# Default-Start: 3 5
++# Default-Start: 2 3 4 5
+ # Default-Stop:
++# Short-Description: Link Layer Discovery Protocol Agent Daemon
+ # Description: Link Layer Discovery Protocol Agent Daemon
+ ### END INIT INFO
+ 
