@@ -1,0 +1,117 @@
+index 5cfac83..4875cb3 100644
+--- a/config.c
++++ b/config.c
+@@ -50,6 +50,7 @@
+ #include "config.h"
+ #include "clif_msgs.h"
+ #include "lldp/l2_packet.h"
++#include "lldp_mod.h"
+ 
+ config_t lldpad_cfg;
+ static int cfg_loaded = false;
+@@ -151,10 +152,22 @@ void scan_port(void *eloop_data, void *user_ctx)
+ 	 */
+ 	p = nameidx;
+ 	while (p->if_index != 0) {
+-		if (is_valid_lldp_device(p->if_name) &&
+-		    check_link_status(p->if_name) > 0) {
+-			oper_add_device(p->if_name);
+-			set_hw_all(p->if_name);
++		struct lldp_module *np;
++		const struct lldp_mod_ops *ops;
++		char *ifname = p->if_name;
++
++		if (is_valid_lldp_device(ifname)) {
++			if (check_link_status(ifname)) {
++				oper_add_device(ifname);
++				set_hw_all(ifname);
++			} else {
++				LIST_FOREACH(np, &lldp_head, lldp) {
++					ops = np->ops;
++					if (ops->lldp_mod_ifdown)
++						ops->lldp_mod_ifdown(ifname);
++				}
++				set_lldp_port_enable_state(ifname, 0);
++			}
+ 		}
+ 		p++;
+ 	}
+diff --git a/event_iface.c b/event_iface.c
+index 439e4d0..20af82e 100644
+--- a/event_iface.c
++++ b/event_iface.c
+@@ -117,13 +117,12 @@ int oper_add_device(char *device_name)
+ 	} else if (!port->portEnabled)
+ 		reinit_port(device_name);
+ 
+-	if (!port || !port->portEnabled) {
+-		LIST_FOREACH(np, &lldp_head, lldp) {
+-			ops = np->ops;
+-			if (ops->lldp_mod_ifup)
+-				ops->lldp_mod_ifup(device_name);
+-		}
++	LIST_FOREACH(np, &lldp_head, lldp) {
++		ops = np->ops;
++		if (ops->lldp_mod_ifup)
++			ops->lldp_mod_ifup(device_name);
+ 	}
++
+ 	set_lldp_port_enable_state(device_name, 1);
+ 	return 0;
+ }
+@@ -242,9 +241,7 @@ static void event_iface_receive(int sock, void *eloop_ctx, void *sock_ctx)
+ 
+ 	if (result < 0) {
+ 		perror("recvfrom(Event interface)");
+-		if ((errno == ENOBUFS) || (errno == EAGAIN))
+-			eloop_register_timeout(INI_TIMER, 0, scan_port,
+-					       NULL, NULL);
++		eloop_register_timeout(INI_TIMER, 0, scan_port, NULL, NULL);
+ 		return;
+ 	}
+ 
+diff --git a/lldp_dcbx.c b/lldp_dcbx.c
+index 443f277..4ba068c 100644
+--- a/lldp_dcbx.c
++++ b/lldp_dcbx.c
+@@ -452,7 +452,7 @@ void dcbx_ifup(char *ifname)
+ 	dud = find_module_user_data_by_if(ifname, &lldp_head, LLDP_MOD_DCBX);
+ 	tlvs = dcbx_data(ifname);	
+ 
+-	if (!port || !check_port_dcb_mode(ifname)) 
++	if (!port || tlvs || !check_port_dcb_mode(ifname))
+ 		return;
+ 
+ 	/* if no adminStatus setting or wrong setting for adminStatus,
+@@ -540,6 +540,9 @@ void dcbx_ifdown(char *device_name)
+ 
+ 	tlvs = dcbx_data(device_name);
+ 
++	if (!tlvs)
++		return;
++
+ 	/* remove dcb port */
+ 	if (check_port_dcb_mode(device_name)) {
+ 		dcbx_remove_adapter(device_name);
+diff --git a/lldpad.c b/lldpad.c
+index a89b5a4..a41f727 100644
+--- a/lldpad.c
++++ b/lldpad.c
+@@ -384,8 +384,6 @@ int main(int argc, char *argv[])
+ 		exit(1);
+ 	}
+ 
+-	ctrl_iface_register(clifd);
+-
+ 	/* Find available interfaces, read in the lldpad.conf file and
+ 	 * add adapters */
+ 	init_ports();
+@@ -399,6 +397,8 @@ int main(int argc, char *argv[])
+ 		exit(1);
+ 	}
+ 
++	ctrl_iface_register(clifd);
++
+ 	LLDPAD_WARN("%s is starting", argv[0]);
+ 	eloop_run();
+ 	LLDPAD_WARN("%s is stopping", argv[0]);

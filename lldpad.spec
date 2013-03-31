@@ -1,6 +1,6 @@
 Name:           lldpad
 Version:        0.9.38
-Release:        3%{?dist}
+Release:        3%{?dist}.2
 Summary:        Intel LLDP Agent
 
 Group:          System Environment/Daemons
@@ -10,6 +10,7 @@ Source0:		http://downloads.sourceforge.net/project/e1000/DCB%20Tools/%{name}/%{v
 Patch0:         lldpad-0.9.7-init.patch
 Patch1:         lldpad-0.9.19-init-lsb.patch
 Patch2:         lldpad-0.9.29-make.patch
+Patch3:         lldpad-0.9.38-missing-link-events-fix.patch
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
 Requires:         kernel >= 2.6.32
@@ -40,7 +41,7 @@ that use %{name}.
 %patch0 -p1 -b .init
 %patch1 -p1 -b .init-lsb
 %patch2 -p1 -b .make
-
+%patch3 -p1 -b .missing-link-events-fix
 
 %build
 %configure
@@ -79,8 +80,8 @@ test -e %{_includedir}/dcbd || `ln -T -s %{_includedir}/lldpad %{_includedir}/dc
 test -e %{_includedir}/dcbd/clif_cmds.h || `ln -T -s %{_includedir}/lldpad/lldp_dcbx_cmds.h %{_includedir}/dcbd/clif_cmds.h`
 
 %preun devel
-test -e %{_includedir}/dcbd/clif_cmds.h && `rm -f %{_includedir}/dcbd/clif_cmds.h`
-test -e %{_includedir}/dcbd && `rm -f %{_includedir}/dcbd`
+test -e %{_includedir}/dcbd/clif_cmds.h && `rm -f %{_includedir}/dcbd/clif_cmds.h` || true
+test -e %{_includedir}/dcbd && `rm -f %{_includedir}/dcbd` || true
 
 
 %files
@@ -100,6 +101,14 @@ test -e %{_includedir}/dcbd && `rm -f %{_includedir}/dcbd`
 
 
 %changelog
+* Fri Oct 29 2010 Petr Sabata <psabata@redhat.com> - 0.9.38-3.2
+- lldpad-devel postun: do not fail on multilib systems
+- Related: rhbz#639414
+
+* Mon Oct  4 2010 Petr Sabata <psabata@redhat.com> - 0.9.38-3.1
+- patch to resolve hang observed during FCoE boot due to dcbx failing to initiate PFC and FCoE app priority negotiations
+- Resolves: rhbz#639414
+
 * Fri Jul 30 2010 Jan Zeleny <jzeleny@redhat.com> - 0.9.38-3
 - another version of previous fix
 
